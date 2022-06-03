@@ -3,7 +3,7 @@
 import rospy
 from turtlebot import Turtlebot
 from geometry_msgs.msg import Point
-from math import pi
+from math import pi, degrees
 
 
 class RouteController():
@@ -14,27 +14,33 @@ class RouteController():
         self.index = 0
 
     def start(self):
-        rospy.sleep(1.0)
-        while self.index < len(mapData):
-            next_point = mapData[self.index]['position']
-            velocity = mapData[self.index]['velocity']
-            robot.move_to_point(next_point, velocity)
-            self.index += 1
+        rospy.sleep(2.0)
+        
+        for i in range(10):
+            self.index = 0
+            while self.index < len(mapData):
+                next_point = mapData[self.index]['position']
+                velocity = mapData[self.index]['velocity']
+                robot.move_to_point(next_point, velocity)
+                self.index += 1
+        
+        self.robot.rotate_to_angle(0)
         print("Done")
 
 
 if __name__ == "__main__":
     mapData = [
-        {'position': Point(2.0, 2.0, 0.0), 'velocity': 0.3},
-        {'position': Point(-2.0, 2.0, 0.0), 'velocity': 0.4},
-        {'position': Point(-2.0, -2.0, 0.0), 'velocity': 0.2},
+        {'position': Point(1.0, 0.0, 0.0), 'velocity': 0.1},
+        {'position': Point(1.0, 1.0, 0.0), 'velocity': 0.1},
+        {'position': Point(0, 1.0, 0.0), 'velocity': 0.2},
         {'position': Point(0, 0, 0.0), 'velocity': 0.3}
     ]
     robot = Turtlebot()
     route_controller = RouteController(mapData, robot)
     route_controller.start()
+    
+    # robot.reset_robot()
 
-    # robot.stop_robot()
 
     # rospy.sleep(2.0)
     # Rotate Test
@@ -47,12 +53,8 @@ if __name__ == "__main__":
     # robot.rotate_to_angle(0.0)
 
     # Go to Point
-    # target_point = Point(2, 2, 0)
+    # target_point = Point(1, 0, 0)
     # rospy.sleep(2.0)
-
-    # robot.move_straight()
-    # rospy.sleep(0.2)
-    # robot.stop_robot()
 
     # (position, rotation) = robot.get_odom()
     # print(position.x, position.y)

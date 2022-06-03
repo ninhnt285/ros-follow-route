@@ -3,6 +3,7 @@
 from math import pi, radians, acos, sqrt, degrees
 import rospy
 from geometry_msgs.msg import Twist, Point, Quaternion
+from std_msgs.msg import Empty
 from nav_msgs.msg import Odometry
 import tf
 from tf.transformations import euler_from_quaternion
@@ -16,6 +17,7 @@ class Turtlebot():
     def __init__(self):
         rospy.init_node('turtlebot_control_node', anonymous=True)
         self.vel_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+        self.reset_publisher = rospy.Publisher('/reset', Empty, queue_size=1)
         self.odom_sub = rospy.Subscriber('/odom', Odometry, self.odom_callback)
 
         self.cmd = Twist()
@@ -37,6 +39,7 @@ class Turtlebot():
             connections = self.vel_publisher.get_num_connections()
             if connections > 0:
                 self.vel_publisher.publish(self.cmd)
+                self.rate.sleep()
                 #rospy.loginfo("Cmd Published")
                 break
             else:
@@ -45,6 +48,12 @@ class Turtlebot():
     def shutdownhook(self):
         # works better than the rospy.is_shutdown()
         self.ctrl_c = True
+
+    def reset_robot(self):
+        while not self.ctrl_c:
+            self.reset_publisher.publish()
+            self.rate.sleep()
+            break
 
     def odom_callback(self, msg):
         self.position = msg.pose.pose.position
@@ -62,7 +71,7 @@ class Turtlebot():
 
     def move_straight(self):
         # Initilize velocities
-        self.cmd.linear.x = 0.5
+        self.cmd.linear.x = 0.01
         self.cmd.linear.y = 0
         self.cmd.linear.z = 0
         self.cmd.angular.x = 0
@@ -93,7 +102,7 @@ class Turtlebot():
         self.cmd.linear.x = speed
 
         print("- Move distance: ", max_distance)
-        while distance < max_distance:
+        while distance < max_distance  and not self.ctrl_c:
             self.vel_publisher.publish(self.cmd)
             self.rate.sleep()
 
@@ -120,7 +129,7 @@ class Turtlebot():
         return target_angle
 
     def move_to_point(self, point, velocity):
-        rospy.sleep(1.0)
+        self.rate.sleep()
         print("Move to point", point.x, point.y)
         # Rotate
         target_angle = self.find_target_angle(point)
@@ -128,7 +137,7 @@ class Turtlebot():
 
         distance = self.calc_distance(self.position, point)
         print("- Start moving: velocity = ", velocity)
-        while distance > 0.01:
+        while distance > 0.01 and not self.ctrl_c:
             # Find angular step
             target_angle = self.find_target_angle(point)
             diff_angle = self.find_diff_angle(target_angle)
@@ -147,24 +156,6 @@ class Turtlebot():
         
         # Stop robot
         self.stop_robot()
-
-    def move_to_point_1(self, point, velocity):
-        rospy.sleep(1.0)
-        print("Move to point", point.x, point.y)
-
-        distance = self.calc_distance(self.position, point)
-        while distance > 0.1:
-            # Rotate
-            target_angle = self.find_target_angle(point)
-            self.rotate_to_angle(target_angle)
-            # Go straight
-            self.move_straight_velocity(point, velocity)
-            # Stop
-            self.stop_robot()
-            rospy.sleep(1.0)
-
-            print("- Current Position: ", self.position.x, self.position.y)
-            distance = self.calc_distance(self.position, point)
 
     def get_odom(self):
         return (self.position, self.yaw)
@@ -208,7 +199,7 @@ class Turtlebot():
 
         # Begin the rotation
         # print(abs(turn_angle + self.angular_tolerance), abs(goal_angle))
-        while abs(turn_angle + self.angular_tolerance) < abs(goal_angle) and not rospy.is_shutdown():
+        while abs(turn_angle + self.angular_tolerance) < abs(goal_angle) and not self.ctrl_c:
             # Publish the Twist message and sleep 1 cycle
             self.vel_publisher.publish(self.cmd)
             self.rate.sleep()
