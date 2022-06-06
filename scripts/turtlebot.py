@@ -5,7 +5,6 @@ import rospy
 from geometry_msgs.msg import Twist, Point, Quaternion
 from std_msgs.msg import Empty
 from nav_msgs.msg import Odometry
-import tf
 from tf.transformations import euler_from_quaternion
 
 
@@ -32,7 +31,7 @@ class Turtlebot():
         self.rate = rospy.Rate(10)
         self.odom_frame = '/odom'
         self.angular_tolerance = radians(1)
-        rospy.on_shutdown(self.shutdownhook)
+        rospy.on_shutdown(self.shutdown_hook)
 
     def publish_once_in_cmd_vel(self):
         while not self.ctrl_c:
@@ -40,20 +39,23 @@ class Turtlebot():
             if connections > 0:
                 self.vel_publisher.publish(self.cmd)
                 self.rate.sleep()
-                #rospy.loginfo("Cmd Published")
                 break
             else:
                 self.rate.sleep()
 
-    def shutdownhook(self):
+    def shutdown_hook(self):
         # works better than the rospy.is_shutdown()
         self.ctrl_c = True
 
     def reset_robot(self):
         while not self.ctrl_c:
-            self.reset_publisher.publish()
-            self.rate.sleep()
-            break
+            connections = self.reset_publisher.get_num_connections()
+            if connections > 0:
+                self.reset_publisher.publish()
+                self.rate.sleep()
+                break
+            else:
+                self.rate.sleep()
 
     def odom_callback(self, msg):
         self.position = msg.pose.pose.position
@@ -137,7 +139,7 @@ class Turtlebot():
 
         distance = self.calc_distance(self.position, point)
         print("- Start moving: velocity = ", velocity)
-        while distance > 0.01 and not self.ctrl_c:
+        while distance > 0.04 and not self.ctrl_c:
             # Find angular step
             target_angle = self.find_target_angle(point)
             diff_angle = self.find_diff_angle(target_angle)
