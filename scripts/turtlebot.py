@@ -5,11 +5,13 @@ import rospy
 from geometry_msgs.msg import Twist, Point, Quaternion
 from std_msgs.msg import Empty
 from nav_msgs.msg import Odometry
+import tf
 from tf.transformations import euler_from_quaternion
 
 
 DISTANCE_EPSILON = 1e-4
 DEFAULT_SPEED = 0.5
+
 
 class Turtlebot():
 
@@ -31,7 +33,7 @@ class Turtlebot():
         self.rate = rospy.Rate(10)
         self.odom_frame = '/odom'
         self.angular_tolerance = radians(1)
-        rospy.on_shutdown(self.shutdown_hook)
+        rospy.on_shutdown(self.shutdownhook)
 
     def publish_once_in_cmd_vel(self):
         while not self.ctrl_c:
@@ -39,23 +41,20 @@ class Turtlebot():
             if connections > 0:
                 self.vel_publisher.publish(self.cmd)
                 self.rate.sleep()
+                #rospy.loginfo("Cmd Published")
                 break
             else:
                 self.rate.sleep()
 
-    def shutdown_hook(self):
+    def shutdownhook(self):
         # works better than the rospy.is_shutdown()
         self.ctrl_c = True
 
     def reset_robot(self):
         while not self.ctrl_c:
-            connections = self.reset_publisher.get_num_connections()
-            if connections > 0:
-                self.reset_publisher.publish()
-                self.rate.sleep()
-                break
-            else:
-                self.rate.sleep()
+            self.reset_publisher.publish()
+            self.rate.sleep()
+            break
 
     def odom_callback(self, msg):
         self.position = msg.pose.pose.position
@@ -104,7 +103,7 @@ class Turtlebot():
         self.cmd.linear.x = speed
 
         print("- Move distance: ", max_distance)
-        while distance < max_distance  and not self.ctrl_c:
+        while distance < max_distance and not self.ctrl_c:
             self.vel_publisher.publish(self.cmd)
             self.rate.sleep()
 
@@ -138,8 +137,12 @@ class Turtlebot():
         self.rotate_to_angle(target_angle)
 
         distance = self.calc_distance(self.position, point)
+        max_distance = distance
+        start_point = self.position
         print("- Start moving: velocity = ", velocity)
-        while distance > 0.04 and not self.ctrl_c:
+        moved_distance = 0.0
+
+        while distance > 0.02 and (moved_distance < max_distance) and not self.ctrl_c:
             # Find angular step
             target_angle = self.find_target_angle(point)
             diff_angle = self.find_diff_angle(target_angle)
@@ -149,13 +152,14 @@ class Turtlebot():
             self.cmd.angular.z = step_angle
             # Find velocity step
             distance = self.calc_distance(self.position, point)
-            step_vel = min(max(distance/2.0, 0.02), velocity)
+            moved_distance = self.calc_distance(start_point, self.position)
+            step_vel = min(max(distance/2.0, 0.015), velocity)
             self.cmd.linear.x = step_vel
             # Publish vel
             # print(step_angle, step_vel, distance)
             self.vel_publisher.publish(self.cmd)
             self.rate.sleep()
-        
+
         # Stop robot
         self.stop_robot()
 
